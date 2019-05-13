@@ -9,7 +9,6 @@ from time import sleep
 
 from serial import Serial
 from acomms.modem_connections.serial_connection import SerialConnection
-from Queue import Empty
 
 
 class IridiumConnection(SerialConnection):
