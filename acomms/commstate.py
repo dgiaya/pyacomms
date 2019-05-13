@@ -4,14 +4,15 @@ Created on Jan 25, 2012
 @author: Eric
 '''
 
-from messageparams import Packet, Rates, DataFrame
+from acomms.messageparams import Packet, Rates, DataFrame
 
 import threading
 
+
 class CommState(object):
-    '''
+    """
     classdocs
-    '''
+    """
 
     # Default timeout for each state.  Call timeout method after this time has elapsed.
     timeout_seconds = 10
@@ -19,7 +20,6 @@ class CommState(object):
     def __init__(self, modem):
         self.modem = modem
         self.state_timer = None
-
 
     def entering(self):
         self.modem._daemon_log.debug("Entering new state: " + str(self))
@@ -36,31 +36,38 @@ class CommState(object):
         if self.timeout_seconds:
             self.state_timer = threading.Timer(self.timeout_seconds, self.timeout)
 
-
     def got_cacyc(self, cycleinfo):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got CACYC")
         pass
+
     def got_catxf(self):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got CATXF")
         pass
+
     def got_cadrq(self, drqparams):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got CADRQ")
         pass
+
     def got_carx(self, rxdataframe):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got CARXD")
         pass
+
     def got_badcrc(self):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got Bad CRC")
         pass
+
     def got_datatimeout(self, frame_num):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got DATA_TIMEOUT")
         pass
+
     def got_packettimeout(self):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got PACKET_TIMEOUT")
         pass
+
     def got_pskerror(self, message):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got PSK Error")
         pass
+
     def got_carev(self, msg):
         self.modem._daemon_log.debug("[" + str(self) + "]: Got CAREV")
         # See if we just rebooted.
@@ -148,8 +155,6 @@ class Idle(CommState):
         else:
             self.modem._changestate(WaitingForRxData)
 
-
-            
     def send_packet(self, packet):
         self.modem._daemon_log.info("Sending packet from Idle")
         
@@ -178,7 +183,8 @@ class Idle(CommState):
 
     def __str__(self):
         return "Idle"
-        
+
+
 class WaitingForCacyc(CommState):
     ''' State: Waiting for the modem to echo a $CACYC message in response to a $CCCYC message that we issued. '''
 
@@ -242,7 +248,6 @@ class WaitingForDrq(CommState):
     def entering(self):
         super(WaitingForDrq, self).entering()
 
-        
     def got_cadrq(self, drqparams):
         CommState.got_cadrq(self, drqparams)
         
@@ -352,7 +357,8 @@ class WaitingForTxf(CommState):
         
     def __str__(self):
         return "Waiting for CATXF"
-        
+
+
 class WaitingForCiTxf(CommState):
     ''' State: Waiting for the $CATXF message when we expect the modem to transmit a cycle init. '''
 
@@ -416,7 +422,7 @@ class WaitingForPacket(CommState):
         CommState.entering(self)
         
         # Start the timeout timer
-        #self.modem.start_timeout(settings.packet_timeout)
+        # self.modem.start_timeout(settings.packet_timeout)
 
     def got_cacyc(self, cycleinfo):
         CommState.got_cacyc(self, cycleinfo)
@@ -436,7 +442,7 @@ class WaitingForPacket(CommState):
     def got_packettimeout(self):
         CommState.got_packettimeout(self)
         
-        #TODO: Raise error here
+        # TODO: Raise error here
         
         self.modem._changestate(Idle)
         
@@ -449,7 +455,8 @@ class WaitingForPacket(CommState):
         
     def __str__(self):
         return "Waiting for packet"
-        
+
+
 class WaitingForRxData(CommState):
     ''' State: Waiting for $CARXD or $CARXA messages after getting a $CACYC message that suggests we should.  '''
 
@@ -536,7 +543,5 @@ class WaitingForRxData(CommState):
         self.modem.on_packetrx_failed()
         self.modem._changestate(Idle)
 
-
     def __str__(self):
         return "Waiting for RX Data"
-                
