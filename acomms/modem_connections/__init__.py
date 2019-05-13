@@ -1,11 +1,11 @@
 __author__ = 'Eric'
 
-from modem_connection import ModemConnection
-from iridium_connection import IridiumConnection
-from serial_connection import SerialConnection
-from sbd_connection import SBDEmailConnection
-from tcp_connection import TcpConnection
-from udp_connection import UdpConnection
-from tcp_client_connection import TcpClientConnection
+from acomms.modem_connections.modem_connection import ModemConnection
+from acomms.modem_connections.iridium_connection import IridiumConnection
+from acomms.modem_connections.serial_connection import SerialConnection
+from acomms.modem_connections.sbd_connection import SBDEmailConnection
+from acomms.modem_connections.tcp_connection import TcpConnection
+from acomms.modem_connections.udp_connection import UdpConnection
+from acomms.modem_connections.tcp_client_connection import TcpClientConnection
 
 
