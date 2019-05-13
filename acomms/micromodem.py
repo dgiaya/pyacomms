@@ -2,7 +2,7 @@
 import os
 from time import sleep, time
 from datetime import datetime
-import timeutil
+import acomms.timeutil
 import re
 from queue import Empty, Full
 from queue import Queue
