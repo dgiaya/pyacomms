@@ -1,10 +1,6 @@
-from messageparams import CycleInfo, DrqParams, DataFrame, Ack, data_from_hexstring, hexstring_from_data
-from cyclestats import CycleStats, TransmitStats
-from modemlog import ModemLog
-from timeutil import *
-import commstate
-from binascii import hexlify, unhexlify
-import datetime
+from acomms.messageparams import CycleInfo, DrqParams, DataFrame, Ack, data_from_hexstring, hexstring_from_data
+from acomms.cyclestats import CycleStats, TransmitStats
+from acomms.timeutil import *
 import sys
 import traceback
 import os
