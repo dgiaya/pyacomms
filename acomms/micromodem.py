@@ -1,74 +1,74 @@
 #!/usr/bin/env python
 import os
 from time import sleep, time
-from datetime import datetime, date
+from datetime import datetime
 import timeutil
 import re
-from Queue import Empty, Full
-from Queue import Queue
+from queue import Empty, Full
+from queue import Queue
 import logging
 import struct
 from collections import namedtuple
-from bitstring import BitArray
 import hashlib
 from binascii import hexlify
 from serial import Serial
 import binascii
 import ctypes
+import functools
 
-import commstate
-from messageparser import MessageParser
-from messageparams import Packet, CycleInfo, hexstring_from_data, Rates, DataFrame, FDPMiniRates, FDPDataRates,LDRRates
+import acomms.commstate
+from acomms.messageparser import MessageParser
+from acomms.messageparams import Packet, CycleInfo, hexstring_from_data, Rates, DataFrame, FDPMiniRates, FDPDataRates,LDRRates
 from acomms.modem_connections import SerialConnection
 from acomms.modem_connections import IridiumConnection
 from acomms.modem_connections import SBDEmailConnection
-from unifiedlog import UnifiedLog
+from acomms.unifiedlog import UnifiedLog
 
 # Convert a string to a byte listing
 toBytes = lambda inpStr: map(ord, inpStr)
 # Convert a list to a hex string (each byte == 2 hex chars)
 toHexStr = lambda inpLst: "".join(["%02X" % x for x in inpLst])
 # Calculate hex-encoded, XOR checksum for input string per NMEA 0183.
-nmeaChecksum = lambda inpStr: toHexStr([reduce(lambda x, y: x ^ y, toBytes(inpStr))])
+nmeaChecksum = lambda inpStr: toHexStr([functools.reduce(lambda x, y: x ^ y, toBytes(inpStr))])
 # Convert boolean to C / CCL / Modem representation (0,1)
 bool2int = lambda inbool: inbool and 1 or 0
 
 
 def nmeaChecksum32(inpStr):
     crc32tabr = [
-        0x00000000L, 0x8c8cd047L, 0xb5dec035L, 0x39521072L, 0xc77ae0d1L, 0x4bf63096L, 0x72a420e4L, 0xfe28f0a3L,
-        0x2232a119L, 0xaebe715eL, 0x97ec612cL, 0x1b60b16bL, 0xe54841c8L, 0x69c4918fL, 0x509681fdL, 0xdc1a51baL,
-        0x44654232L, 0xc8e99275L, 0xf1bb8207L, 0x7d375240L, 0x831fa2e3L, 0x0f9372a4L, 0x36c162d6L, 0xba4db291L,
-        0x6657e32bL, 0xeadb336cL, 0xd389231eL, 0x5f05f359L, 0xa12d03faL, 0x2da1d3bdL, 0x14f3c3cfL, 0x987f1388L,
-        0x88ca8464L, 0x04465423L, 0x3d144451L, 0xb1989416L, 0x4fb064b5L, 0xc33cb4f2L, 0xfa6ea480L, 0x76e274c7L,
-        0xaaf8257dL, 0x2674f53aL, 0x1f26e548L, 0x93aa350fL, 0x6d82c5acL, 0xe10e15ebL, 0xd85c0599L, 0x54d0d5deL,
-        0xccafc656L, 0x40231611L, 0x79710663L, 0xf5fdd624L, 0x0bd52687L, 0x8759f6c0L, 0xbe0be6b2L, 0x328736f5L,
-        0xee9d674fL, 0x6211b708L, 0x5b43a77aL, 0xd7cf773dL, 0x29e7879eL, 0xa56b57d9L, 0x9c3947abL, 0x10b597ecL,
-        0xbd526873L, 0x31deb834L, 0x088ca846L, 0x84007801L, 0x7a2888a2L, 0xf6a458e5L, 0xcff64897L, 0x437a98d0L,
-        0x9f60c96aL, 0x13ec192dL, 0x2abe095fL, 0xa632d918L, 0x581a29bbL, 0xd496f9fcL, 0xedc4e98eL, 0x614839c9L,
-        0xf9372a41L, 0x75bbfa06L, 0x4ce9ea74L, 0xc0653a33L, 0x3e4dca90L, 0xb2c11ad7L, 0x8b930aa5L, 0x071fdae2L,
-        0xdb058b58L, 0x57895b1fL, 0x6edb4b6dL, 0xe2579b2aL, 0x1c7f6b89L, 0x90f3bbceL, 0xa9a1abbcL, 0x252d7bfbL,
-        0x3598ec17L, 0xb9143c50L, 0x80462c22L, 0x0ccafc65L, 0xf2e20cc6L, 0x7e6edc81L, 0x473cccf3L, 0xcbb01cb4L,
-        0x17aa4d0eL, 0x9b269d49L, 0xa2748d3bL, 0x2ef85d7cL, 0xd0d0addfL, 0x5c5c7d98L, 0x650e6deaL, 0xe982bdadL,
-        0x71fdae25L, 0xfd717e62L, 0xc4236e10L, 0x48afbe57L, 0xb6874ef4L, 0x3a0b9eb3L, 0x03598ec1L, 0x8fd55e86L,
-        0x53cf0f3cL, 0xdf43df7bL, 0xe611cf09L, 0x6a9d1f4eL, 0x94b5efedL, 0x18393faaL, 0x216b2fd8L, 0xade7ff9fL,
-        0xd663b05dL, 0x5aef601aL, 0x63bd7068L, 0xef31a02fL, 0x1119508cL, 0x9d9580cbL, 0xa4c790b9L, 0x284b40feL,
-        0xf4511144L, 0x78ddc103L, 0x418fd171L, 0xcd030136L, 0x332bf195L, 0xbfa721d2L, 0x86f531a0L, 0x0a79e1e7L,
-        0x9206f26fL, 0x1e8a2228L, 0x27d8325aL, 0xab54e21dL, 0x557c12beL, 0xd9f0c2f9L, 0xe0a2d28bL, 0x6c2e02ccL,
-        0xb0345376L, 0x3cb88331L, 0x05ea9343L, 0x89664304L, 0x774eb3a7L, 0xfbc263e0L, 0xc2907392L, 0x4e1ca3d5L,
-        0x5ea93439L, 0xd225e47eL, 0xeb77f40cL, 0x67fb244bL, 0x99d3d4e8L, 0x155f04afL, 0x2c0d14ddL, 0xa081c49aL,
-        0x7c9b9520L, 0xf0174567L, 0xc9455515L, 0x45c98552L, 0xbbe175f1L, 0x376da5b6L, 0x0e3fb5c4L, 0x82b36583L,
-        0x1acc760bL, 0x9640a64cL, 0xaf12b63eL, 0x239e6679L, 0xddb696daL, 0x513a469dL, 0x686856efL, 0xe4e486a8L,
-        0x38fed712L, 0xb4720755L, 0x8d201727L, 0x01acc760L, 0xff8437c3L, 0x7308e784L, 0x4a5af7f6L, 0xc6d627b1L,
-        0x6b31d82eL, 0xe7bd0869L, 0xdeef181bL, 0x5263c85cL, 0xac4b38ffL, 0x20c7e8b8L, 0x1995f8caL, 0x9519288dL,
-        0x49037937L, 0xc58fa970L, 0xfcddb902L, 0x70516945L, 0x8e7999e6L, 0x02f549a1L, 0x3ba759d3L, 0xb72b8994L,
-        0x2f549a1cL, 0xa3d84a5bL, 0x9a8a5a29L, 0x16068a6eL, 0xe82e7acdL, 0x64a2aa8aL, 0x5df0baf8L, 0xd17c6abfL,
-        0x0d663b05L, 0x81eaeb42L, 0xb8b8fb30L, 0x34342b77L, 0xca1cdbd4L, 0x46900b93L, 0x7fc21be1L, 0xf34ecba6L,
-        0xe3fb5c4aL, 0x6f778c0dL, 0x56259c7fL, 0xdaa94c38L, 0x2481bc9bL, 0xa80d6cdcL, 0x915f7caeL, 0x1dd3ace9L,
-        0xc1c9fd53L, 0x4d452d14L, 0x74173d66L, 0xf89bed21L, 0x06b31d82L, 0x8a3fcdc5L, 0xb36dddb7L, 0x3fe10df0L,
-        0xa79e1e78L, 0x2b12ce3fL, 0x1240de4dL, 0x9ecc0e0aL, 0x60e4fea9L, 0xec682eeeL, 0xd53a3e9cL, 0x59b6eedbL,
-        0x85acbf61L, 0x09206f26L, 0x30727f54L, 0xbcfeaf13L, 0x42d65fb0L, 0xce5a8ff7L, 0xf7089f85L, 0x7b844fc2L]
-    crc = 0xffffffffL
+        0x00000000, 0x8c8cd047, 0xb5dec035, 0x39521072, 0xc77ae0d1, 0x4bf63096, 0x72a420e4, 0xfe28f0a3,
+        0x2232a119, 0xaebe715e, 0x97ec612c, 0x1b60b16b, 0xe54841c8, 0x69c4918f, 0x509681fd, 0xdc1a51ba,
+        0x44654232, 0xc8e99275, 0xf1bb8207, 0x7d375240, 0x831fa2e3, 0x0f9372a4, 0x36c162d6, 0xba4db291,
+        0x6657e32b, 0xeadb336c, 0xd389231e, 0x5f05f359, 0xa12d03fa, 0x2da1d3bd, 0x14f3c3cf, 0x987f1388,
+        0x88ca8464, 0x04465423, 0x3d144451, 0xb1989416, 0x4fb064b5, 0xc33cb4f2, 0xfa6ea480, 0x76e274c7,
+        0xaaf8257d, 0x2674f53a, 0x1f26e548, 0x93aa350f, 0x6d82c5ac, 0xe10e15eb, 0xd85c0599, 0x54d0d5de,
+        0xccafc656, 0x40231611, 0x79710663, 0xf5fdd624, 0x0bd52687, 0x8759f6c0, 0xbe0be6b2, 0x328736f5,
+        0xee9d674f, 0x6211b708, 0x5b43a77a, 0xd7cf773d, 0x29e7879e, 0xa56b57d9, 0x9c3947ab, 0x10b597ec,
+        0xbd526873, 0x31deb834, 0x088ca846, 0x84007801, 0x7a2888a2, 0xf6a458e5, 0xcff64897, 0x437a98d0,
+        0x9f60c96a, 0x13ec192d, 0x2abe095f, 0xa632d918, 0x581a29bb, 0xd496f9fc, 0xedc4e98e, 0x614839c9,
+        0xf9372a41, 0x75bbfa06, 0x4ce9ea74, 0xc0653a33, 0x3e4dca90, 0xb2c11ad7, 0x8b930aa5, 0x071fdae2,
+        0xdb058b58, 0x57895b1f, 0x6edb4b6d, 0xe2579b2a, 0x1c7f6b89, 0x90f3bbce, 0xa9a1abbc, 0x252d7bfb,
+        0x3598ec17, 0xb9143c50, 0x80462c22, 0x0ccafc65, 0xf2e20cc6, 0x7e6edc81, 0x473cccf3, 0xcbb01cb4,
+        0x17aa4d0e, 0x9b269d49, 0xa2748d3b, 0x2ef85d7c, 0xd0d0addf, 0x5c5c7d98, 0x650e6dea, 0xe982bdad,
+        0x71fdae25, 0xfd717e62, 0xc4236e10, 0x48afbe57, 0xb6874ef4, 0x3a0b9eb3, 0x03598ec1, 0x8fd55e86,
+        0x53cf0f3c, 0xdf43df7b, 0xe611cf09, 0x6a9d1f4e, 0x94b5efed, 0x18393faa, 0x216b2fd8, 0xade7ff9f,
+        0xd663b05d, 0x5aef601a, 0x63bd7068, 0xef31a02f, 0x1119508c, 0x9d9580cb, 0xa4c790b9, 0x284b40fe,
+        0xf4511144, 0x78ddc103, 0x418fd171, 0xcd030136, 0x332bf195, 0xbfa721d2, 0x86f531a0, 0x0a79e1e7,
+        0x9206f26f, 0x1e8a2228, 0x27d8325a, 0xab54e21d, 0x557c12be, 0xd9f0c2f9, 0xe0a2d28b, 0x6c2e02cc,
+        0xb0345376, 0x3cb88331, 0x05ea9343, 0x89664304, 0x774eb3a7, 0xfbc263e0, 0xc2907392, 0x4e1ca3d5,
+        0x5ea93439, 0xd225e47e, 0xeb77f40c, 0x67fb244b, 0x99d3d4e8, 0x155f04af, 0x2c0d14dd, 0xa081c49a,
+        0x7c9b9520, 0xf0174567, 0xc9455515, 0x45c98552, 0xbbe175f1, 0x376da5b6, 0x0e3fb5c4, 0x82b36583,
+        0x1acc760b, 0x9640a64c, 0xaf12b63e, 0x239e6679, 0xddb696da, 0x513a469d, 0x686856ef, 0xe4e486a8,
+        0x38fed712, 0xb4720755, 0x8d201727, 0x01acc760, 0xff8437c3, 0x7308e784, 0x4a5af7f6, 0xc6d627b1,
+        0x6b31d82e, 0xe7bd0869, 0xdeef181b, 0x5263c85c, 0xac4b38ff, 0x20c7e8b8, 0x1995f8ca, 0x9519288d,
+        0x49037937, 0xc58fa970, 0xfcddb902, 0x70516945, 0x8e7999e6, 0x02f549a1, 0x3ba759d3, 0xb72b8994,
+        0x2f549a1c, 0xa3d84a5b, 0x9a8a5a29, 0x16068a6e, 0xe82e7acd, 0x64a2aa8a, 0x5df0baf8, 0xd17c6abf,
+        0x0d663b05, 0x81eaeb42, 0xb8b8fb30, 0x34342b77, 0xca1cdbd4, 0x46900b93, 0x7fc21be1, 0xf34ecba6,
+        0xe3fb5c4a, 0x6f778c0d, 0x56259c7f, 0xdaa94c38, 0x2481bc9b, 0xa80d6cdc, 0x915f7cae, 0x1dd3ace9,
+        0xc1c9fd53, 0x4d452d14, 0x74173d66, 0xf89bed21, 0x06b31d82, 0x8a3fcdc5, 0xb36dddb7, 0x3fe10df0,
+        0xa79e1e78, 0x2b12ce3f, 0x1240de4d, 0x9ecc0e0a, 0x60e4fea9, 0xec682eee, 0xd53a3e9c, 0x59b6eedb,
+        0x85acbf61, 0x09206f26, 0x30727f54, 0xbcfeaf13, 0x42d65fb0, 0xce5a8ff7, 0xf7089f85, 0x7b844fc2]
+    crc = 0xffffffff
     bytestring = bytearray(inpStr.encode("iso-8859-1"))
     for i in range(len(bytestring)):
         crc = (crc >> 8) ^ crc32tabr[0xff & (crc ^ bytestring[i])]
@@ -103,7 +103,7 @@ class Micromodem(object):
         self.nmea_listeners = []
 
         self.parser = MessageParser(self)
-        self.state = commstate.Idle(modem=self)
+        self.state = acomms.commstate.Idle(modem=self)
 
         self.rxframe_listeners = []
         self.cst_listeners = []
@@ -286,7 +286,7 @@ class Micromodem(object):
                 try:
                     for func in self.nmea_listeners:
                         func(msg)  # Pass the message to any custom listeners.
-                except Exception, e:
+                except Exception as e:
                     self._daemon_log.warn("Error in custom listener: ")
                     self._daemon_log.warn(repr(e))
 
@@ -1156,6 +1156,7 @@ class Micromodem(object):
         if hasattr(func, '__call__'):
             self.get_uplink_data_function = func
 
+    """
     def request_modem_log(self, all_or_newest=1, order=0, num_to_retrieve=0, filter_params=[], timeout=None):
         filtr = BitArray(hex='0x00')
         if 'Modem To Host' in filter_params:
@@ -1177,6 +1178,7 @@ class Micromodem(object):
         self.write_nmea(msg)
 
         response = self.wait_for_nmea_type('CARBR', timeout=timeout, params=[1, 0, '', '', ''])
+    """
 
     def update_firmware(self, firmware_file_path, slot=1, reboot=False, File_location=0, data_upload_callback_fxn=None,
                         done_call_back_fxn=None):
