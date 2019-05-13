@@ -2,7 +2,7 @@ __author__ = 'Eric'
 
 from bitstring import BitStream, BitArray
 from datetime import datetime
-from messageparams import data_from_hexstring
+from acomms.messageparams import data_from_hexstring
 
 mission_modes = {0: "Mission completed",
                  1: "Manual",
