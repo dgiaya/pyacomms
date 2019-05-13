@@ -1,6 +1,6 @@
 __author__ = 'andrew'
 
-from timeutil import *
+from acomms.timeutil import *
 
 
 class ModemLog(dict):
