@@ -1,6 +1,6 @@
 __author__ = 'andrew'
 
-from modem_connection import ModemConnection
+from acomms.modem_connections.modem_connection import ModemConnection
 import asyncore
 from socket import AF_INET, SOCK_STREAM
 from threading import Thread
