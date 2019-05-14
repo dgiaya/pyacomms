@@ -528,6 +528,13 @@ class WaitingForRxData(CommState):
         else:
             # We are still waiting for the next frame.
             pass
+
+    def got_packettimeout(self):
+        CommState.got_packettimeout(self)
+
+        # TODO: Raise error here
+
+        self.modem._changestate(Idle)
         
     def timeout(self):
         CommState.timeout(self)
