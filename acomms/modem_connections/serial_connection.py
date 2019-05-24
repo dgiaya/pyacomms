@@ -53,7 +53,7 @@ class SerialConnection(ModemConnection):
 
     def readline(self):
         """Returns a \n terminated line from the modem.  Only returns complete lines (or None on timeout)"""
-        rl = self._serialport.readline()
+        rl = self._serialport.readline().decode('utf-8')
 
         if rl == "":
             return None
@@ -69,4 +69,4 @@ class SerialConnection(ModemConnection):
             return rl
 
     def write(self, data):
-        self._serialport.write(data)
+        self._serialport.write(data.encode('utf-8'))
