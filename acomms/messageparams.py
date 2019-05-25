@@ -1,17 +1,21 @@
-from binascii import hexlify, unhexlify
 
 def data_from_hexstring(hexstring):
+    databytes = bytes.fromhex(hexstring)
+    return databytes
+    """
     databytes = bytearray()
     try:
         databytes.extend([ord(c) for c in unhexlify(hexstring)])
     #Catch Odd-length String Error
     except TypeError:
         pass
-    
-    return databytes
+
+    return databytes"""
+
 
 def hexstring_from_data(databytes):
-    return hexlify(bytes(databytes))
+    # return hexlify(bytes(databytes))
+    return databytes.hex()
 
 
 class CycleInfo(object):
@@ -20,12 +24,12 @@ class CycleInfo(object):
         self.dest = int(dest)
         self.rate_num = int(rate_num)
         self.ack = bool(ack)
-        
+
         if num_frames == None:
             self.num_frames = Rates[rate_num].numframes
         else:
             self.num_frames = int(num_frames)
-        
+
     # This allows us to see if two cycleinfo objects match
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
@@ -33,7 +37,8 @@ class CycleInfo(object):
 
 class DrqParams(object):
     def __repr__(self):
-        return "SRC: {} DST: {} ACK: {} NUMBYTES: {} FRAME#: {}".format(self.src,self.dest,self.ack,self.num_bytes,self.frame_num)
+        return "SRC: {} DST: {} ACK: {} NUMBYTES: {} FRAME#: {}".format(self.src, self.dest, self.ack, self.num_bytes,
+                                                                        self.frame_num)
 
     def __init__(self, src, dest, ack, num_bytes, frame_num):
         self.src = int(src)
@@ -45,13 +50,30 @@ class DrqParams(object):
 
 class Ack(object):
     def __repr__(self):
-        return "SRC: {} DST: {} FRAME#: {}".format(self.src,self.dest,self.frame_num)
+        return "SRC: {} DST: {} FRAME#: {}".format(self.src, self.dest, self.frame_num)
 
     def __init__(self, src, dest, ack, frame_num):
         self.src = int(src)
         self.dest = int(dest)
         self.ack = bool(ack)
         self.frame_num = int(frame_num)
+
+
+class Camua(object):
+    def __init__(self, src, dest, data):
+        self.src = src
+        self.dest = dest
+        self.data = bytearray(data)
+
+    def __repr__(self):
+        return "SRC: {} DST: {} DATA: {}".format(self.src, self.dest, repr(self.data))
+
+
+class Campr(object):
+    def __init__(self, src, dest, owtt):
+        self.src = src
+        self.dest = dest
+        self.owtt = owtt
 
 
 class DataFrame(object):
@@ -67,11 +89,14 @@ class DataFrame(object):
             self.data = None
 
     def __repr__(self):
-        return "SRC: {} DST: {} ACK: {} FRAME#: {} BAD_CRC: {} DATA: {}".format(self.src,self.dest,self.ack,self.frame_num, self.bad_crc, repr(self.data))
+        return "SRC: {} DST: {} ACK: {} FRAME#: {} BAD_CRC: {} DATA: {}".format(self.src, self.dest, self.ack,
+                                                                                self.frame_num, self.bad_crc,
+                                                                                repr(self.data))
 
 
 class CCPGT(object):
-    def __init__(self, txfreq, txcode,timeout_ms,  codelen, rxfreq, rxcode1, rxcode2, rxcode3, rxcode4, reserved1=0,reserved2=0):
+    def __init__(self, txfreq, txcode, timeout_ms, codelen, rxfreq, rxcode1, rxcode2, rxcode3, rxcode4, reserved1=0,
+                 reserved2=0):
         self.txfreq = txfreq
         self.codelen = codelen
         self.txcode = txcode
@@ -85,35 +110,35 @@ class CCPGT(object):
         self.reserved2 = reserved2
 
         def __repr__(self):
-            return "TXHz: {} RXHz: {} TXCODE: {}".format(self.txfreq,self.rxfreq,self.txcode)
+            return "TXHz: {} RXHz: {} TXCODE: {}".format(self.txfreq, self.rxfreq, self.txcode)
 
 
 class Packet(object):
     def __init__(self, cycleinfo, frames=None):
         self.cycleinfo = cycleinfo
-        
+
         if frames != None:
             self.frames = frames
         else:
             self.frames = []
-            
+
     def append_framedata(self, framedata):
-        #TODO: Make sure we have room for another frame, and that the data fits in the frame.
-        newframe = DataFrame(self.cycleinfo.src, self.cycleinfo.dest, self.cycleinfo.ack, 
+        # TODO: Make sure we have room for another frame, and that the data fits in the frame.
+        newframe = DataFrame(self.cycleinfo.src, self.cycleinfo.dest, self.cycleinfo.ack,
                              (len(self.frames) + 1), framedata)
         self.frames.append(newframe)
-            
-        
+
+
 class PacketRate(object):
     def __init__(self, name, number, framesize, numframes):
         self.name = name
         self.number = number
         self.framesize = framesize
         self.numframes = numframes
-    
+
     def getpacketsize(self):
         return self.framesize * self.numframes
-        
+
     maxpacketsize = property(getpacketsize)
 
 
